@@ -1,0 +1,123 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  KRONOS v1.0  —  GitHub Actions Build Workflow                  ║
+# ║  Compiler : MSVC (cl.exe)  via Visual Studio 2022               ║
+# ║  Target   : Windows x64  (GT 730 / i3-2120 runtime target)      ║
+# ║  Triggers : push to main/master  +  any version tag  (v*.*.*)   ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+name: KRONOS Build
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:     [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:          # lets you trigger manually from GitHub UI
+
+jobs:
+  build-windows:
+    name: Build  (MSVC  ·  x64  ·  Windows)
+    runs-on: windows-latest   # Windows Server 2022, VS 2022, full Windows SDK
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Set up MSVC developer environment ───────────────────────
+      #   This gives us cl.exe, link.exe, and all SDK include/lib paths
+      - name: Set up MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # ── 3. Verify tools are present ────────────────────────────────
+      - name: Verify cl.exe
+        run: cl /?
+        shell: cmd
+        continue-on-error: true   # cl /? exits with non-zero, that's fine
+
+      # ── 4. Compile KRONOS ──────────────────────────────────────────
+      #   Flags mirror the header comment exactly, plus:
+      #     /W3        — sensible warning level
+      #     /Fo  /Fe   — explicit object + exe output names
+      #     /MT        — statically link CRT (exe runs without MSVC redist)
+      #     /DNDEBUG   — disable asserts in release
+      #     /arch:SSE2 — safe baseline (Nehalem/Sandy Bridge era target)
+      - name: Compile KRONOS_v1.cpp
+        shell: cmd
+        run: |
+          cl ^
+            /O2 /EHsc /W3 /MT /DNDEBUG /arch:SSE2 ^
+            /Fo"KRONOS_v1.obj" ^
+            /Fe"KRONOS_v1.exe" ^
+            KRONOS_v1.cpp ^
+            d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib ^
+            /link /SUBSYSTEM:CONSOLE /MACHINE:X64
+
+      # ── 5. Quick sanity check ──────────────────────────────────────
+      - name: Verify output binary exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "KRONOS_v1.exe")) {
+            Write-Error "KRONOS_v1.exe not found — build failed."
+            exit 1
+          }
+          $size = (Get-Item "KRONOS_v1.exe").Length / 1KB
+          Write-Host "KRONOS_v1.exe  —  $([math]::Round($size,1)) KB  — OK"
+
+      # ── 6. Upload build artifact (every push) ─────────────────────
+      - name: Upload KRONOS executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: KRONOS_v1_x64
+          path: KRONOS_v1.exe
+          retention-days: 30
+
+      # ── 7. Create GitHub Release  (only on version tags) ──────────
+      #   Push a tag like  v1.0.0  and this step fires automatically.
+      #   The .exe is attached to the release as a downloadable asset.
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "KRONOS ${{ github.ref_name }}  —  The Eternal Frame"
+          body: |
+            ## KRONOS Frame Generation Engine  ${{ github.ref_name }}
+
+            **Generalized Fréchet Fusion · LK Flow · APEX TCF · GFF**
+
+            Evolved from NEXUS v1.1 × FlowFrameX v8.0
+
+            ### Target hardware
+            - GPU : GT 730 GF108 Fermi  (DDR3 64-bit bus)
+            - CPU : Intel Core i3-2120
+            - RAM : 6 GB DDR3
+            - API : D3D11 CS 5.0 · DXGI 1.2 · Windows 8+
+
+            ### What's inside
+            | Feature | Detail |
+            |---|---|
+            | GFF Fusion | Adaptive power mean p ∈ [−1, 0]  (WGM ↔ WHM) |
+            | Optical Flow | Lucas-Kanade 5×5 true 2D, shared-mem tiles |
+            | APEX TCF | Tile-Consensus Flow, 3 KB groupshared |
+            | FLGE | Log-geodesic temporal in **linear light** |
+            | FASW | Anisotropic wave PDE in **linear light** |
+            | Gates | JOD · OFC · DIV · TCF · TConsist · Sharp |
+            | Timing | µs spin-wait · EMA capture rate |
+
+            ### How to run
+            ```
+            KRONOS_v1.exe
+            ```
+            Requires Windows 8+ with a D3D11-capable GPU.
+            Run as Administrator for Desktop Duplication capture.
+
+            ### Build info
+            Compiled with MSVC `/O2 /MT /arch:SSE2` — no MSVC runtime redistributable needed.
+          files: KRONOS_v1.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
