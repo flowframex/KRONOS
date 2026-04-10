@@ -53,7 +53,7 @@ jobs:
             /Fo"KRONOS_v1.obj" ^
             /Fe"KRONOS_v1.exe" ^
             KRONOS_v1.cpp ^
-            d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib ^
+            d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib user32.lib ^
             /link /SUBSYSTEM:CONSOLE /MACHINE:X64
 
       # ── 5. Quick sanity check ──────────────────────────────────────
