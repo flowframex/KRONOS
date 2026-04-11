@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║  KRONOS v1.0  —  GitHub Actions Build Workflow                  ║
+# ║  KRONOS v3.0  —  GitHub Actions Build Workflow                  ║
 # ║  Compiler : MSVC (cl.exe)  via Visual Studio 2022               ║
 # ║  Target   : Windows x64  (GT 730 / i3-2120 runtime target)      ║
 # ║  Triggers : push to main/master  +  any version tag  (v*.*.*)   ║
