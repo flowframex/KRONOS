@@ -346,7 +346,7 @@ static void ShowRunning(int fps)
     snprintf(b, sizeof(b), "%d fps out  (capture ~%d fps)", fps, fps/2);
     Row("\xe2\x9a\xa1", "Target output",       b,                                              C_GOLD2);
     Row("\xf0\x9f\x94\xae", "Algorithm",       "KRONOS GFF — WGM\xe2\x86\x94WHM adaptive",    C_VIOLET);
-    Row("\xf0\x9f\x8c\x8a", "Optical flow",    "LK 5\xc3\x975 BGRA-correct + APEX TCF",       C_CYAN);
+    Row("\xf0\x9f\x8c\x8a", "Optical flow",    "LK 5\xc3\x97" "5 BGRA-correct + APEX TCF",      C_CYAN);
     Row("\xe2\x9c\xa8", "Pillars",              "AnisoWarp + FLGE(\xcf\x84=0.50) + FASW(CFL)", C_CYAN);
     Row("\xf0\x9f\x94\x92", "Capture",         "DXGI Dup  \xe2\x86\x92  WDA_EXCLUDEFROMCAPTURE", C_GREEN);
     Row("\xe2\x8f\xb1", "Timing",              "\xc2\xb5s spin-wait + EMA + timeBeginPeriod(1)", C_GREEN);
@@ -391,7 +391,7 @@ static void PrintStats(double capFps, double outFps, double captureMs,
            C_GREY, A_RESET);
 
     // Line 3 — accuracy + latency
-    printf("  %sSynth accuracy%s %s%.1f%%%s   %sCap\xe2\x86\x92Display%s %s%.0f\xc2\xb5s%s\n",
+    printf("  %sSynth accuracy%s %s%.1f%%%s   %sCap\xe2\x86\x92" "Display%s %s%.0f\xc2\xb5s%s\n",
            C_LGREY, A_RESET, C_GREEN A_BOLD, acc, A_RESET,
            C_LGREY, A_RESET, C_CYAN A_BOLD, latUs, A_RESET);
 
@@ -401,8 +401,8 @@ static void PrintStats(double capFps, double outFps, double captureMs,
         double budgetMB = vramBudget / (1024.0 * 1024.0);
         double pct      = 100.0 * usedMB / std::max(budgetMB, 1.0);
         const char* vc  = (pct > 85.0) ? C_RED : (pct > 65.0) ? C_ORANGE : C_GREEN;
-        printf("  %sVRAM%s  %s%.0f%s/%s%.0f MB%s  (%.0f%%)\n",
-               C_LGREY, A_RESET, vc A_BOLD, usedMB, A_RESET,
+        printf("  %sVRAM%s  %s%s%.0f%s/%s%.0f MB%s  (%.0f%%)\n",
+               C_LGREY, A_RESET, vc, A_BOLD, usedMB, A_RESET,
                C_LGREY, budgetMB, A_RESET, pct);
     } else {
         printf("  %sVRAM%s  %s(IDXGIAdapter3 not available on this OS)%s\n",
@@ -410,7 +410,7 @@ static void PrintStats(double capFps, double outFps, double captureMs,
     }
 
     // Line 5 — engine tag
-    printf("  %s[KRONOS v3] LK+GFF+APEX  \xcf\x84-fix\xc2\xb7FASW-CFL\xc2\xb7NoFeedback\xc2\xb7DPI-aware%s\n",
+    printf("  %s[KRONOS v3] LK+GFF+APEX  \xcf\x84-fix\xc2\xb7" "FASW-CFL\xc2\xb7NoFeedback\xc2\xb7" "DPI-aware%s\n",
            C_CYAN A_DIM, A_RESET);
 
     fflush(stdout);
@@ -883,11 +883,6 @@ static HWND              g_hwnd        = nullptr;   // hotkey message window
 static HWND              g_overlayHwnd = nullptr;   // overlay window (global) [v3]
 static std::atomic<bool> g_quit       {false};
 static const int HOTKEY_ID = 42;
-
-// Stats accumulators for accuracy + latency
-static double g_latencyUs      = 0.0;
-static int    g_synthPredUsed  = 0;
-static int    g_synthTotal     = 0;
 
 /* ============================================================================
    Error macros
