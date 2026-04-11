@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║  KRONOS v3.0  —  GitHub Actions Build Workflow                  ║
+# ║  KRONOS v4.0  —  GitHub Actions Build Workflow                  ║
 # ║  Compiler : MSVC (cl.exe)  via Visual Studio 2022               ║
 # ║  Target   : Windows x64  (GT 730 / i3-2120 runtime target)      ║
 # ║  Triggers : push to main/master  +  any version tag  (v*.*.*)   ║
@@ -45,14 +45,14 @@ jobs:
       #     /MT        — statically link CRT (exe runs without MSVC redist)
       #     /DNDEBUG   — disable asserts in release
       #     /arch:SSE2 — safe baseline (Nehalem/Sandy Bridge era target)
-      - name: Compile KRONOS_v3.cpp
+      - name: Compile KRONOS_v4.cpp
         shell: cmd
         run: |
           cl ^
             /O2 /EHsc /W3 /MT /DNDEBUG /arch:SSE2 ^
-            /Fo"KRONOS_v3.obj" ^
-            /Fe"KRONOS_v3.exe" ^
-            KRONOS_v3.cpp ^
+            /Fo"KRONOS_v4.obj" ^
+            /Fe"KRONOS_v4.exe" ^
+            KRONOS_v4.cpp ^
             d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib user32.lib ^
             /link /SUBSYSTEM:CONSOLE /MACHINE:X64
 
@@ -60,19 +60,19 @@ jobs:
       - name: Verify output binary exists
         shell: pwsh
         run: |
-          if (!(Test-Path "KRONOS_v3.exe")) {
-            Write-Error "KRONOS_v3.exe not found — build failed."
+          if (!(Test-Path "KRONOS_v4.exe")) {
+            Write-Error "KRONOS_v4.exe not found — build failed."
             exit 1
           }
-          $size = (Get-Item "KRONOS_v3.exe").Length / 1KB
-          Write-Host "KRONOS_v3.exe  —  $([math]::Round($size,1)) KB  — OK"
+          $size = (Get-Item "KRONOS_v4.exe").Length / 1KB
+          Write-Host "KRONOS_v4.exe  —  $([math]::Round($size,1)) KB  — OK"
 
       # ── 6. Upload build artifact (every push) ─────────────────────
       - name: Upload KRONOS executable
         uses: actions/upload-artifact@v4
         with:
-          name: KRONOS_v3_x64
-          path: KRONOS_v3.exe
+          name: KRONOS_v4_x64
+          path: KRONOS_v4.exe
           retention-days: 30
 
       # ── 7. Create GitHub Release  (only on version tags) ──────────
@@ -109,14 +109,14 @@ jobs:
 
             ### How to run
             ```
-            KRONOS_v3.exe
+            KRONOS_v4.exe
             ```
             Requires Windows 8+ with a D3D11-capable GPU.
             Run as Administrator for Desktop Duplication capture.
 
             ### Build info
             Compiled with MSVC `/O2 /MT /arch:SSE2` — no MSVC runtime redistributable needed.
-          files: KRONOS_v3.exe
+          files: KRONOS_v4.exe
           draft: false
           prerelease: false
         env:
