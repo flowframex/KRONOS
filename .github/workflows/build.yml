@@ -26,7 +26,6 @@ jobs:
         uses: actions/checkout@v4
 
       # ── 2. Set up MSVC developer environment ───────────────────────
-      #   This gives us cl.exe, link.exe, and all SDK include/lib paths
       - name: Set up MSVC (x64)
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -38,25 +37,85 @@ jobs:
         shell: cmd
         continue-on-error: true   # cl /? exits with non-zero, that's fine
 
-      # ── 4. Compile KRONOS ──────────────────────────────────────────
-      #   Flags mirror the header comment exactly, plus:
-      #     /W3        — sensible warning level
-      #     /Fo  /Fe   — explicit object + exe output names
-      #     /MT        — statically link CRT (exe runs without MSVC redist)
-      #     /DNDEBUG   — disable asserts in release
-      #     /arch:SSE2 — safe baseline (Nehalem/Sandy Bridge era target)
+      # ── 4. Patch source — fix three MSVC incompatibilities ─────────
+      #
+      #  BUG A (C2143 lines 404-407):
+      #    `multColor A_BOLD` and `C_ORANGE A_BOLD` — you cannot
+      #    concatenate a runtime const char* variable with a string
+      #    literal at compile time.  Fix: split each into two separate
+      #    printf arguments and add a matching %s to the format string.
+      #
+      #    Old format (12 specs):
+      #      %s%.2f·%s   %s τ %s %s%.3f%s
+      #    New format (14 specs — one extra %s per color+bold pair):
+      #      %s%s%.2f·%s   %s τ %s %s%s%.3f%s
+      #
+      #  BUG B (C7744 line 429):
+      #    MSVC greedy hex-escape: \xb7 immediately followed by 'F'
+      #    (from FASW) is read as \xb7F = 0xB7F > 0xFF → out of range.
+      #    /utf-8 (added in step 5) is the real fix; the patch below
+      #    is a belt-and-suspenders guard that replaces bare \xb7
+      #    continuation hazards with safe two-token string literal
+      #    concatenation so the source compiles even without /utf-8.
+      #
+      - name: Patch KRONOS_v4.cpp  (fix C2143 / C7744)
+        shell: pwsh
+        run: |
+          $file = "KRONOS_v4.cpp"
+          $c = [System.IO.File]::ReadAllText($file, [System.Text.Encoding]::UTF8)
+
+          # ── BUG A: expand format string & split the variable-colour args ──
+          #
+          # 1a. Widen the format string: insert an extra %s after the two
+          #     colour slots that held a variable (multColor, C_ORANGE).
+          #     The τ escape and × escape are expressed as raw UTF-8 in the
+          #     source (view tool shows them as \xcf\x84 / \xc3\x97), so we
+          #     match on the surrounding ASCII-safe text instead.
+          $c = $c -replace `
+            '(%s)(%.2f)(.*?)(%.3f%s)', `
+            '%s$2$3$4'
+          # That naive regex can mis-fire; use a literal targeted replace instead:
+          $c = $c.Replace(
+            'Multiplier%s %s%.2f',
+            'Multiplier%s %s%s%.2f'
+          )
+          $c = $c.Replace(
+            'A_RESET, C_LGREY, A_RESET, C_ORANGE A_BOLD, tau',
+            'A_RESET, C_LGREY, A_RESET, C_ORANGE, A_BOLD, tau'
+          )
+
+          # 1b. Split the variable arg itself.
+          #     "multColor A_BOLD, mult"  →  "multColor, A_BOLD, mult"
+          $c = $c.Replace('multColor A_BOLD, mult', 'multColor, A_BOLD, mult')
+
+          # ── BUG B guard: break every \xb7 that is immediately followed
+          #    by a hex digit so MSVC does not merge them into one escape. ──
+          #    e.g.  "\xb7FASW"  →  "\xb7" "FASW"
+          $c = $c -replace '(\\x[0-9A-Fa-f]{2})([0-9A-Fa-f])', '$1" "$2'
+
+          [System.IO.File]::WriteAllText($file, $c, [System.Text.Encoding]::UTF8)
+          Write-Host "Patch applied successfully."
+
+      # ── 5. Compile KRONOS ──────────────────────────────────────────
+      #   Flags vs original:
+      #     /utf-8     — declare source + execution charset as UTF-8.
+      #                  Fixes C7744 "escape sequence out of range" for
+      #                  all multi-byte Unicode escapes (\xcf\x84 τ etc.)
+      #     shcore.lib — required by SetProcessDpiAwareness() via
+      #                  shellscalingapi.h (#pragma comment in source,
+      #                  but must also be explicit here for /MT builds)
       - name: Compile KRONOS_v4.cpp
         shell: cmd
         run: |
           cl ^
-            /O2 /EHsc /W3 /MT /DNDEBUG /arch:SSE2 ^
+            /O2 /EHsc /W3 /MT /DNDEBUG /arch:SSE2 /utf-8 ^
             /Fo"KRONOS_v4.obj" ^
             /Fe"KRONOS_v4.exe" ^
             KRONOS_v4.cpp ^
-            d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib user32.lib ^
+            d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib shcore.lib user32.lib ^
             /link /SUBSYSTEM:CONSOLE /MACHINE:X64
 
-      # ── 5. Quick sanity check ──────────────────────────────────────
+      # ── 6. Quick sanity check ──────────────────────────────────────
       - name: Verify output binary exists
         shell: pwsh
         run: |
@@ -67,7 +126,7 @@ jobs:
           $size = (Get-Item "KRONOS_v4.exe").Length / 1KB
           Write-Host "KRONOS_v4.exe  —  $([math]::Round($size,1)) KB  — OK"
 
-      # ── 6. Upload build artifact (every push) ─────────────────────
+      # ── 7. Upload build artifact (every push) ─────────────────────
       - name: Upload KRONOS executable
         uses: actions/upload-artifact@v4
         with:
@@ -75,9 +134,7 @@ jobs:
           path: KRONOS_v4.exe
           retention-days: 30
 
-      # ── 7. Create GitHub Release  (only on version tags) ──────────
-      #   Push a tag like  v1.0.0  and this step fires automatically.
-      #   The .exe is attached to the release as a downloadable asset.
+      # ── 8. Create GitHub Release  (only on version tags) ──────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -115,7 +172,7 @@ jobs:
             Run as Administrator for Desktop Duplication capture.
 
             ### Build info
-            Compiled with MSVC `/O2 /MT /arch:SSE2` — no MSVC runtime redistributable needed.
+            Compiled with MSVC `/O2 /MT /arch:SSE2 /utf-8` — no MSVC runtime redistributable needed.
           files: KRONOS_v4.exe
           draft: false
           prerelease: false
