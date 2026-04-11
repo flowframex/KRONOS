@@ -45,14 +45,14 @@ jobs:
       #     /MT        — statically link CRT (exe runs without MSVC redist)
       #     /DNDEBUG   — disable asserts in release
       #     /arch:SSE2 — safe baseline (Nehalem/Sandy Bridge era target)
-      - name: Compile KRONOS_v2.cpp
+      - name: Compile KRONOS_v3.cpp
         shell: cmd
         run: |
           cl ^
             /O2 /EHsc /W3 /MT /DNDEBUG /arch:SSE2 ^
             /Fo"KRONOS_v3.obj" ^
             /Fe"KRONOS_v3.exe" ^
-            KRONOS_v2.cpp ^
+            KRONOS_v3.cpp ^
             d3d11.lib dxgi.lib d3dcompiler.lib winmm.lib user32.lib ^
             /link /SUBSYSTEM:CONSOLE /MACHINE:X64
 
